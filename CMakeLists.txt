@@ -1,0 +1,43 @@
+cmake_minimum_required(VERSION 3.18)
+project(signal_backtester CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+option(SB_WITH_TORCH "Build the LibTorch MLP model" ON)
+option(SB_PYTHON "Build the pybind11 module" ON)
+
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(HDF5 REQUIRED COMPONENTS C)
+
+add_library(sbcore STATIC src/features.cpp src/models.cpp src/backtest.cpp src/h5io.cpp)
+target_include_directories(sbcore PUBLIC src ${HDF5_INCLUDE_DIRS})
+target_link_libraries(sbcore PUBLIC Eigen3::Eigen ${HDF5_C_LIBRARIES})
+
+if(SB_WITH_TORCH)
+  find_package(Torch QUIET)
+  if(Torch_FOUND)
+    message(STATUS "LibTorch found: MLP model enabled")
+    target_compile_definitions(sbcore PUBLIC SB_WITH_TORCH)
+    target_link_libraries(sbcore PUBLIC ${TORCH_LIBRARIES})
+  else()
+    message(STATUS "LibTorch not found: building without the MLP model (set CMAKE_PREFIX_PATH to enable)")
+  endif()
+endif()
+
+add_executable(backtest src/main.cpp)
+target_link_libraries(backtest sbcore)
+
+if(SB_PYTHON)
+  find_package(pybind11 CONFIG QUIET)
+  if(pybind11_FOUND)
+    pybind11_add_module(sigbt python/bindings.cpp)
+    target_link_libraries(sigbt PRIVATE sbcore)
+  else()
+    message(STATUS "pybind11 not found: skipping Python module")
+  endif()
+endif()

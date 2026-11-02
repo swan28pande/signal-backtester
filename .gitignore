@@ -1,0 +1,6 @@
+build/
+__pycache__/
+*.so
+*.h5
+.venv/
+.DS_Store
